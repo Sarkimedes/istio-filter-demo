@@ -1,0 +1,43 @@
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: book-info-product-page-filter
+spec:
+  workloadSelector:
+    labels: 
+      app: productpage
+  configPatches:
+  - applyTo: HTTP_FILTER
+    match: 
+      context: SIDECAR_INBOUND
+      listener:
+        filterChain:
+          filter:
+            name: 'envoy.filters.network.http_connection_manager'
+            subFilter:
+              name: 'envoy.filters.http.router'
+    patch:
+      operation: INSERT_BEFORE
+      value:
+        name: envoy.lua
+        typed_config:
+          "@type": "type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua"
+          inline_code: |
+            function envoy_on_request(request_handle)
+              request_handle:logInfo("Request method: "..request_handle:headers():get(":method"))
+              
+              local body = request_handle:body()
+              if (body ~= null) then
+                local bodyBytes = body:getBytes(0, body:length())
+                request_handle:logInfo("Request body: "..bodyBytes)
+              end
+            end
+            function envoy_on_response(response_handle)
+              response_handle:logInfo("Response status: "..response_handle:headers():get(":status"))
+              
+              local body = response_handle:body()
+              if (body ~= null) then
+                local bodyBytes = body:getBytes(0, body:length())
+                response_handle:logInfo("Response body: "..bodyBytes)
+              end
+            end
